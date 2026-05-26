@@ -205,58 +205,58 @@ module UART_RECEIVER(
     output load
 );
 
-wire baud_tick_R;
-baud_gen_R     B_R(
+wire Sample_tick_R;
+Sample_gen_R     B_R(
                    .clk(clk),
                    .reset(reset),
-                   .baud_tick_R(baud_tick_R)
+                   .Sample_tick_R(Sample_tick_R)
 );
 receiver     R(
                .in(in),
                .reset(reset),
                .clk(clk),
-               .baud_tick_R(baud_tick_R),
+               .Sample_tick_R(Sample_tick_R),
                .data_out(data_out),
                .done(done),
                .load(load)
 );
 endmodule
 
-// baud_rate_receiver = (9600*8) 76800 bits/sec;
+// Sampling_rate_receiver = ( baud_rate_T * 8 ) = (9600*8) 76800 samples/sec;
 
-module baud_gen_R (
+module Sample_gen_R (
     input   clk,
     input   reset,
-    output  baud_tick_R
+    output  Sample_tick_R
 );
 integer count = 1;
-reg baud_tick_R_reg;
+reg Sample_tick_R_reg;
 
-initial baud_tick_R_reg <= 1'b0;
+initial Sample_tick_R_reg <= 1'b0;
 always @(posedge clk) begin
     if(reset)
     begin
        count <= 1;
-       baud_tick_R_reg  <= 1'b1;
+       Sample_tick_R_reg  <= 1'b1;
     end
-    else if(count==5) begin     // count = 5 since // time period of clock = 2.604167us  // one baud tick of receiver occurs for every 0.013020833ms
+    else if(count==5) begin     // count = 5 since // time period of clock = 2.604167us  // one sample tick of receiver occurs for every 0.013020833ms
        count <= 1;
-       baud_tick_R_reg  <= 1'b1;
+       Sample_tick_R_reg  <= 1'b1;
     end
     else begin
         count <= count + 1;
-        baud_tick_R_reg <= 1'b0;
+        Sample_tick_R_reg <= 1'b0;
     end        
 end
 
-assign baud_tick_R = baud_tick_R_reg;
+assign Sample_tick_R = Sample_tick_R_reg;
 
 endmodule
 
 
 module receiver(
     input in,
-    input baud_tick_R,
+    input Sample_tick_R,
     input reset,
     input clk,
     output [7:0] data_out,
@@ -297,7 +297,7 @@ always @(posedge clk , posedge reset) begin
     end     
     else 
     begin
-        if(baud_tick_R) begin
+        if(Sample_tick_R) begin
             case(present_state)
             idle : begin
                     load_reg         <= 1'b0;
@@ -590,4 +590,5 @@ assign done = (present_state == stop);
 assign data_out =  data_correct;
 assign load =  load_reg;
 
+endmodule
 endmodule
