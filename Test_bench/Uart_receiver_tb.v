@@ -13,9 +13,7 @@ reg reset;
 wire [7:0] data_out;
 wire done;
 wire load;
-wire Sample_tick;
 
-assign Sample_tick = DUT.R_S.Sample_tick;
 
 // parameters
 
@@ -35,7 +33,9 @@ UART_RECEIVER   DUT (
 
 // getting Sampling tick
 
+wire Sample_tick;
 
+assign Sample_tick = DUT.R_S.Sample_tick;
 
 // clocks
 
@@ -338,6 +338,24 @@ initial
         #(2*bittime);
         check_data(data_out,7);
         check_done(1'b1,74,"7->4 data read correctly");
+
+         // test - 8 adding a little buffer to the baudrate 
+
+        $display("\n Test-8 Little buffer in the baudrate ");
+        #(300);
+        frame_data(8'h07,framed_data);
+        push_ref(8'h07);
+        done_latched = 1'b0;
+        temp = framed_data;
+        repeat(11)
+        begin
+            rx      = temp[0];
+            temp
+              = {1'b1,temp[10:1]};
+            #(324);
+        end
+        check_data(data_out,8);
+        check_done(1'b1,8," data read correctly during buffer also");
 
         
 
