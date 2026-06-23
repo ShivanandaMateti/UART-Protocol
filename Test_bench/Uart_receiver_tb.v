@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 `default_nettype none
 
-module dummy_tb;
+module Uart_receiver_tb;
 
 // inputs
 reg r_clk;
