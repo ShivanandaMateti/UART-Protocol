@@ -40,7 +40,7 @@ assign Sample_tick = DUT.R_S.Sample_tick;
 // clocks
 
 initial r_clk = 0;
-always #2.5 r_clk = ~r_clk; // 5ns timeperiod
+always #2.5 r_clk <= ~r_clk; // 5ns timeperiod
 
 // Reference scoreboard
 

@@ -107,7 +107,7 @@ initial
 begin 
     b =4'd0 ; 
     transmitting = 1'b0;     // initializing them to start transmission 
-    tx = 1'b1;                // initially transmitter is in ideal state 
+    tx = 1'b1;                // initially transmitter is in idle state 
 end  
        
  

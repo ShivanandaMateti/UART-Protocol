@@ -18,6 +18,5 @@ baud_gen_T Baudgenarator(
     initial clk = 0;
     always #0.001302083 clk = ~clk;   // time period of clock = 2.604167us
     #100 $finish;
-    end
   
 endmodule

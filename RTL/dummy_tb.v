@@ -4,21 +4,23 @@
 module dummy_tb;
 
 // inputs
-reg t_clk;
 reg r_clk;
-reg in;
+reg rx;
 reg reset;
+
 
 
 // outputs 
 wire [7:0] data_out;
 wire done;
 wire load;
+wire Sample_tick;
 
-//parameters
-//parameter Dwidth = 8;
-//parameter Swidth = 8;
+assign Sample_tick = DUT.R_S.Sample_tick;
 
+// parameters
+
+localparam bittime = 273;
 
 
 // Instantiation
@@ -37,20 +39,26 @@ UART_RECEIVER   DUT (
 
 
 // clocks
-initial t_clk = 0;
-always #40 t_clk = ~t_clk;
 
 initial r_clk = 0;
-always #5 r_clk = ~r_clk;
+always #2.5 r_clk <= ~r_clk; // 5ns timeperiod
 
 // Reference scoreboard
 
 // what ever data is sent serially it will be written in this queue
-reg [7:0] ref_queue [0:127];
+reg [7:0] ref_queue [0:1023];
 integer q_head = 0;
 integer q_tail = 0;
 integer pass_cnt = 0;
 integer fail_cnt = 0;
+
+// initializing scoreboard
+integer i;
+initial 
+        begin
+            for(i=0;i<1024;i=i+1)
+                ref_queue[i] <= 8'h00;
+        end
 
 task push_ref;
         input [7:0] data;
@@ -108,12 +116,12 @@ task send_data;
         begin
             temp = framed_data;
             repeat(11)
-                    begin
-                        @(posedge baud_tick_T);begin
-                            in = temp[0];
-                            temp = {1'b1,temp[10:1]};
-                        end
-                    end           
+            begin
+                rx      <= temp[0];
+                temp    <= {1'b1,temp[10:1]};
+                #320;
+            end
+
         end
 endtask
 
@@ -121,12 +129,10 @@ endtask
 
 task apply_reset;
         begin
-            q_head = 0 ;
-            q_tail = 0 ;
             reset  = 1 ;
-            repeat(4) @(posedge t_clk);
+            repeat(10) @(posedge r_clk);
             reset = 0;
-            repeat(2) @(posedge t_clk);
+            repeat(5) @(posedge r_clk);
         end
 endtask
 
@@ -178,7 +184,7 @@ task wait_N;
             count=0;
             while(count<N)
             begin
-                @(posedge baud_tick_T);
+                @(posedge r_clk);
                     count = count + 1;
             end
         end
@@ -190,7 +196,7 @@ reg [10:0] temp;
 
 initial 
     begin
-        in = 1'b1;
+        rx = 1'b1;
         reset = 0;
         
         $dumpfile("dummy.vcd");
@@ -205,7 +211,7 @@ initial
         push_ref(8'h12);
         done_latched = 1'b0;
         send_data(framed_data);
-        wait_N(2);
+        #(2*bittime);
         check_data(data_out,1);
         check_done(1'b1,1,"data read correctly");
 
@@ -216,26 +222,25 @@ initial
         done_latched = 1'b0;
         fork
             begin
-                repeat(11)
-                        begin
-                            @(posedge baud_tick_T);
-                                in = temp[0];
-                                temp = {1'b1,temp[10:1]};
-                        end
+                done_latched = 0;
+                frame_data(8'h22,framed_data);
+                send_data(framed_data);
+                #(2*bittime);
+                check_done(1'b0,2,"data not read correctly due to reset");
             end
             begin
-                wait_N(5);
+                wait_N(128);
                 apply_reset;
             end
         join
-        check_done(1'b0,2,"done = 0 data not read due to reset");
 
+        #(2*bittime);
         $display("\n After deasserting reset we send data again");
         frame_data(8'h55,framed_data);
         push_ref(8'h55);
         done_latched = 1'b0;
         send_data(framed_data);
-        wait_N(2);
+        #(2*bittime);
         check_data(data_out,2);
         check_done(1'b1,2,"data read correctly");
 
@@ -245,14 +250,14 @@ initial
         frame_data_p(8'h07,framed_data);
         done_latched = 1'b0;
         send_data(framed_data);
-        wait_N(12);
+        #(2*bittime);
         check_done(1'b0,3,"data not read due to wrong parity");
 
         //test - 4 - long idle state
         $display("\n test -4 long idle state");
-        in = 1'b1;
+        rx = 1'b1;
         done_latched = 1'b0;
-        wait_N(50);
+        wait_N(1280);
         check_done(1'b0,7,"No data read during idle");
 
         // test - 5 data sent with no gap
@@ -262,32 +267,32 @@ initial
         push_ref(8'h01);
         done_latched = 1'b0;
         send_data(framed_data);
-        wait_N(2);
-        check_data(data_out,4);
+        #(2*bittime);
+        check_data(data_out,5);
         check_done(1'b1,51,"data read correctly");
         //d2
         frame_data(8'h10,framed_data);
         push_ref(8'h10);
         done_latched = 1'b0;
         send_data(framed_data);
-        wait_N(2);
-        check_data(data_out,4);
+        #(2*bittime);
+        check_data(data_out,5);
         check_done(1'b1,52,"data read correctly");
         //d3
         frame_data(8'h00,framed_data);
         push_ref(8'h00);
         done_latched = 1'b0;
         send_data(framed_data);
-        wait_N(2);
-        check_data(data_out,4);
+        #(2*bittime);
+        check_data(data_out,5);
         check_done(1'b1,53,"data read correctly");
         //d4
         frame_data(8'hff,framed_data);
         push_ref(8'hff);
         done_latched = 1'b0;
         send_data(framed_data);
-        wait_N(2);
-        check_data(data_out,4);
+        #(2*bittime);
+        check_data(data_out,5);
         check_done(1'b1,54,"data read correctly");
 
         // test-6 no stop bit
@@ -295,43 +300,64 @@ initial
         frame_data_s(8'h21,framed_data);
         done_latched = 1'b0;
         send_data(framed_data);
-        wait_N(12);
+        #(2*bittime);
         check_done(1'b0,6,"wrong stop bit given");
 
         // test-7 data patterns
+        rx = 1'b1;
+        wait_N(640);
         $display("\n Test-7 data sent in serial patterns");
         //d1
         frame_data(8'h55,framed_data);
         push_ref(8'h55);
         done_latched = 1'b0;
         send_data(framed_data);
-        wait_N(2);
-        check_data(data_out,6);
+        #(2*bittime);
+        check_data(data_out,7);
         check_done(1'b1,71,"data read correctly");
         //d2
         frame_data(8'haa,framed_data);
         push_ref(8'haa);
         done_latched = 1'b0;
         send_data(framed_data);
-        wait_N(2);
-        check_data(data_out,6);
+        #(2*bittime);
+        check_data(data_out,7);
         check_done(1'b1,72,"data read correctly");
         //d3
         frame_data(8'h0f,framed_data);
         push_ref(8'h0f);
         done_latched = 1'b0;
         send_data(framed_data);
-        wait_N(2);
-        check_data(data_out,6);
+        #(2*bittime);
+        check_data(data_out,7);
         check_done(1'b1,73,"data read correctly");
-        //
+        //d4
         frame_data(8'hf0,framed_data);
         push_ref(8'hf0);
         done_latched = 1'b0;
         send_data(framed_data);
-        wait_N(2);
-        check_data(data_out,6);
-        check_done(1'b1,74,"data read correctly");
+        #(2*bittime);
+        check_data(data_out,7);
+        check_done(1'b1,74," data read correctly");
+
+        // test - 8 adding a little buffer to the baudrate 
+
+        $display("\n Test-8 Little buffer in the baudrate ");
+        #(300);
+        frame_data(8'h07,framed_data);
+        push_ref(8'h07);
+        done_latched = 1'b0;
+        temp = framed_data;
+        repeat(11)
+        begin
+            rx      = temp[0];
+            temp  = {1'b1,temp[10:1]};
+            #(324);
+        end
+        check_data(data_out,8);
+        check_done(1'b1,8," data read correctly during buffer also");
+
+            
 
         
 
@@ -349,6 +375,8 @@ initial
         #50000000000 $display("\n Runtime error !!!");
         $finish;
     end
+
+
 
 endmodule
 

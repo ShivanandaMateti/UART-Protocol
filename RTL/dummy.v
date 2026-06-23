@@ -10,11 +10,21 @@ module UART_RECEIVER(
 );
 
 
+wire Sample_tick,restart;
+
+Sample_gen  R_S( 
+                .r_clk(r_clk),
+                .reset(reset),
+                .restart(restart),
+                .Sample_tick(Sample_tick)
+            );
+
+
 receiver     R(
                .rx(rx),
                .reset(reset),
                .r_clk(r_clk),
-               .baud_tick_T(baud_tick_T) ,
+               .Sample_tick(Sample_tick) ,
                .data_out(data_out),
                .done(done),
                .load(load),
@@ -36,23 +46,23 @@ module Sample_gen (
 
 reg [2:0] count;
 reg Sample_tick_reg;
-always@(posedge clk,posedge reset)begin
+always@(posedge r_clk,posedge reset)begin
     if(reset || restart)begin
-        Sample_tick <= 0;
-        count       <= 0;
+        Sample_tick_reg <= 0;
+        count           <= 1;
     end
     else begin
         count       <= count + 3'd1;
         if(count == 3'd4)begin
             Sample_tick_reg <= 1;
-            count           <= 0;
+            count           <= 1;
         end
         else
             Sample_tick_reg <= 0;
     end
-
-    assign Sample_tick  = Sample_tick_reg; 
 end
+assign Sample_tick  = Sample_tick_reg; 
+
 
 endmodule
 
@@ -82,10 +92,11 @@ localparam start = 0,
 
 reg [2:0] present_state;
 reg load_reg;
+reg restart_reg;
 reg p; // flag for detecting parity,start and stop bits at midpoint
 reg [7:0] data_temp;
 reg [7:0] data_correct;
-reg [2:0] count_s = 0; // sampling counter
+reg [3:0] count_s = 0; // sampling counter
 reg [2:0] data_bit_count = 0;         // data bit counter
 initial load_reg = 1'b0;
 
@@ -98,12 +109,16 @@ always @(posedge r_clk , posedge reset) begin
         data_temp     <= 8'h00;
         count_s       <= 0;
         data_bit_count<= 0;
+        restart_reg   <= 1'b0;
+        p             <= 1'b0;
+        load_reg      <= 1'b0;
     end
     else if(rx==0 && (present_state == idle)) begin
-        present_state <= start;
-        restart       <= 1'b1;
+        present_state     <= start;
+        restart_reg       <= 1'b1;
     end
     else begin
+        restart_reg       <= 1'b0;
         if(Sample_tick) begin
             case(present_state)
 
@@ -112,7 +127,7 @@ always @(posedge r_clk , posedge reset) begin
                     if(count_s == SamplingWidth/2)
                     begin
                         count_s      <= count_s + 1;
-                        if(in==0)
+                        if(rx==0)
                             p <= 1;
                         else
                             p <= 0;
@@ -134,22 +149,25 @@ always @(posedge r_clk , posedge reset) begin
             data  : if(count_s == SamplingWidth/2)
                         begin
                             count_s                    <= count_s + 1;
-                            data_temp[data_bit_count]  <= in;
+                            data_temp[data_bit_count]  <= rx;
                         end
                     else if(count_s < SamplingWidth-1 )
                             count_s        <= count_s +1;
                     else 
-                        begin
-                            count_s <= 0; 
-                            if(data_bit_count == DataWidth-1) 
+                        begin 
+                            if(data_bit_count == DataWidth-1) begin
                                   present_state <= parity;
-                            else
+                                  count_s <= 0;
+                            end
+                            else begin
                                  data_bit_count <= data_bit_count + 1;
+                                 count_s <= 0;
+                            end
                         end
             parity  :if(count_s == SamplingWidth/2)
                         begin
                             count_s                 <= count_s + 1;
-                            if(in == ~(^data_temp))
+                            if(rx == ~(^data_temp))
                                 p <= 1;
                             else
                                 p <= 0;
@@ -168,7 +186,7 @@ always @(posedge r_clk , posedge reset) begin
             stop    :if(count_s == SamplingWidth/2)
                         begin
                             count_s      <= count_s + 1;
-                            if(in)begin
+                            if(rx)begin
                                 p <= 1;
                                 data_correct <= data_temp;
                             end
@@ -186,33 +204,14 @@ always @(posedge r_clk , posedge reset) begin
                                     present_state    <= error;
                         end
 
-            correct  :if(count_s == SamplingWidth/2)
-                        begin
-                            count_s       <= count_s + 1;
-                            if(in==0)
-                                p <= 1;
-                            else
-                                p <= 0; 
-                        end
-                        else if(count_s < SamplingWidth-1)
-                                count_s        <= count_s +1;
-                        else
-                            begin
-                                count_s        <= 0;
-                                if(p)begin
-                                    present_state  <= data;
-                                    data_bit_count   <= 0;
-                                end
-                                else
-                                    present_state  <= start;
-                            end                   
+            correct  : present_state <= idle;       
 
             error : begin
                     load_reg <= 1'b1;
                     if(count_s == SamplingWidth/2)
                     begin
                         count_s     <= count_s + 1;
-                        if(in)
+                        if(rx)
                             p <= 1;
                         else
                             p <= 0;
@@ -223,7 +222,7 @@ always @(posedge r_clk , posedge reset) begin
                         begin
                             count_s          <= 0;
                             if(p)
-                                present_state    <= start;
+                                present_state    <= idle;
                              else
                                 present_state    <= error;
                         end
@@ -240,6 +239,7 @@ end
 assign done = (present_state == correct);
 assign data_out =  data_correct;
 assign load =  load_reg;
+assign restart = restart_reg;
 
 endmodule
 
