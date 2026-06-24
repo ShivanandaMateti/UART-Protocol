@@ -3,6 +3,12 @@
 
 module Uart_receiver_tb;
 
+// parameters
+
+parameter SamplingWidth = 16;
+parameter DataWidth = 8;
+localparam bittime = 273;
+
 // inputs
 reg r_clk;
 reg rx;
@@ -10,16 +16,10 @@ reg reset;
 
 
 // outputs 
-wire [7:0] data_out;
+wire [DataWidth-1:0] data_out;
 wire done;
 wire load;
 
-
-// parameters
-
-parameter SamplingWidth = 16;
-parameter DataWidth = 8;
-localparam bittime = 273;
 
 
 // Instantiation
@@ -209,6 +209,8 @@ initial
 
         //reset before starting 
         apply_reset;
+
+        $display("\n--------> RX TEST SEQUENCE BEGIN <----------");
 
         // test - 1 everything correct
         $display("\n test - 1 everything correct !");

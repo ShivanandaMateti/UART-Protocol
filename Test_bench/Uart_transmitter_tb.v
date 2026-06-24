@@ -132,6 +132,8 @@ send = 1'b0;
 load = 1'b0;
 data_in = 8'h0;
 
+$display("\n------> TX TEST SEQUENCE BEGIN <--------");
+
 
 // Test - 1 simple data transmission
 $display("\n Test - 1 simple data transmission");
