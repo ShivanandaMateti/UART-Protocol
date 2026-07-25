@@ -205,7 +205,7 @@ initial
         reset = 0;
         
         $dumpfile("dummy.vcd");
-        $dumpvars(0,dummy_tb);
+        $dumpvars(0,Uart_receiver_tb);
 
         //reset before starting 
         apply_reset;
