@@ -563,7 +563,7 @@ end
 
 initial  begin
 
-#50000000000 $display("\n Runtime error !!!");
+#500000 $display("\n Runtime error !!!");
 $finish;
 
 end
